@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidThemeId(val) {
+      return val in ['default', 'dark', 'naruto', 'dragonball', 'deathnote', 'gtavi', 'godofwar', 'custom'];
+    }
+
+    function isValidThemeMode(val) {
+      return val in ['light', 'dark'];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'themeId', 'themeMode', 'storageUsedBytes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'themeId', 'themeMode', 'customAccentColor', 'customBgColor', 'favoriteTools', 'storageUsedBytes', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('email' in data) || (data.email is string && data.email.size() <= 254))
+        && data.themeId is string && isValidThemeId(data.themeId)
+        && data.themeMode is string && isValidThemeMode(data.themeMode)
+        && (!('customAccentColor' in data) || (data.customAccentColor is string && data.customAccentColor.size() <= 20))
+        && (!('customBgColor' in data) || (data.customBgColor is string && data.customBgColor.size() <= 20))
+        && (!('favoriteTools' in data) || (data.favoriteTools is list && data.favoriteTools.size() <= 32 && (data.favoriteTools.size() == 0 || data.favoriteTools[0] is string)))
+        && data.storageUsedBytes is number && data.storageUsedBytes >= 0 && data.storageUsedBytes <= 10737418240
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFileRecord(data, userId) {
+      return data.keys().hasAll(['ownerId', 'fileName', 'mimeType', 'sizeBytes', 'toolUsed', 'retentionMinutes', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'fileName', 'mimeType', 'sizeBytes', 'toolUsed', 'retentionMinutes', 'downloadToken', 'createdAt'])
+        && data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255
+        && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 128
+        && data.sizeBytes is number && data.sizeBytes >= 0 && data.sizeBytes <= 524288000
+        && data.toolUsed is string && data.toolUsed.size() >= 1 && data.toolUsed.size() <= 64
+        && data.retentionMinutes is number && data.retentionMinutes >= 1 && data.retentionMinutes <= 10080
+        && (!('downloadToken' in data) || (data.downloadToken is string && data.downloadToken.size() <= 256))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWorkflow(data, userId) {
+      return data.keys().hasAll(['ownerId', 'name', 'steps', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'description', 'steps', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && (!('description' in data) || (data.description is string && data.description.size() <= 300))
+        && data.steps is list && data.steps.size() >= 1 && data.steps.size() <= 10 && data.steps[0] is string
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHistoryEntry(data, userId) {
+      return data.keys().hasAll(['ownerId', 'toolSlug', 'toolName', 'inputFileName', 'outputFileName', 'outputSizeBytes', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'toolSlug', 'toolName', 'inputFileName', 'outputFileName', 'outputSizeBytes', 'createdAt'])
+        && data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid
+        && data.toolSlug is string && data.toolSlug.size() >= 1 && data.toolSlug.size() <= 64
+        && data.toolName is string && data.toolName.size() >= 1 && data.toolName.size() <= 80
+        && data.inputFileName is string && data.inputFileName.size() >= 1 && data.inputFileName.size() <= 255
+        && data.outputFileName is string && data.outputFileName.size() >= 1 && data.outputFileName.size() <= 255
+        && data.outputSizeBytes is number && data.outputSizeBytes >= 0 && data.outputSizeBytes <= 524288000
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow create: if isValidId(userId) && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['themeId', 'themeMode', 'customAccentColor', 'customBgColor', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['favoriteTools', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'storageUsedBytes', 'updatedAt'])
+        );
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      match /files/{fileId} {
+        allow get: if isValidId(userId) && isValidId(fileId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(fileId) && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidFileRecord(incoming(), userId)
+          && incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(fileId) && isOwner(userId);
+      }
+
+      match /workflows/{workflowId} {
+        allow get: if isValidId(userId) && isValidId(workflowId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(workflowId) && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidWorkflow(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(workflowId) && isOwner(userId)
+          && isValidWorkflow(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'steps', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(workflowId) && isOwner(userId);
+      }
+
+      match /history/{historyId} {
+        allow get: if isValidId(userId) && isValidId(historyId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(historyId) && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidHistoryEntry(incoming(), userId)
+          && incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(historyId) && isOwner(userId);
+      }
+    }
+  }
+}

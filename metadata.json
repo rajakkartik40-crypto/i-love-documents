@@ -1,0 +1,10 @@
+{
+  "name": "I Love Documents",
+  "description": "All-in-one document management, PDF utility, passport photo maker, document scanner, and AI document assistant platform created by Kartik Rajak.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile, theme preferences, favorite tools, and storage metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "themeId": {
+          "type": "string",
+          "enum": ["default", "dark", "naruto", "dragonball", "deathnote", "gtavi", "godofwar", "custom"]
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["light", "dark"]
+        },
+        "customAccentColor": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "customBgColor": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "favoriteTools": {
+          "type": "array",
+          "description": "List of tool slugs favorited by the user (max 32)."
+        },
+        "storageUsedBytes": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "themeId", "themeMode", "storageUsedBytes", "createdAt", "updatedAt"]
+    },
+    "FileRecord": {
+      "title": "FileRecord",
+      "description": "Metadata for uploaded or processed documents (no binary blobs stored in Firestore).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sizeBytes": {
+          "type": "number"
+        },
+        "toolUsed": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "retentionMinutes": {
+          "type": "number"
+        },
+        "downloadToken": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "fileName", "mimeType", "sizeBytes", "toolUsed", "retentionMinutes", "createdAt"]
+    },
+    "Workflow": {
+      "title": "Workflow",
+      "description": "Reusable multi-step PDF processing pipeline configuration.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered tool slugs in workflow (max 10 steps)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "name", "steps", "createdAt", "updatedAt"]
+    },
+    "HistoryEntry": {
+      "title": "HistoryEntry",
+      "description": "Processing and download audit log for the user dashboard.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "toolSlug": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "toolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "inputFileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "outputFileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "outputSizeBytes": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "toolSlug", "toolName", "inputFileName", "outputFileName", "outputSizeBytes", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile, theme settings, and storage usage."
+    },
+    "/users/{userId}/files/{fileId}": {
+      "schema": { "$ref": "#/entities/FileRecord" },
+      "description": "User's processed document metadata records."
+    },
+    "/users/{userId}/workflows/{workflowId}": {
+      "schema": { "$ref": "#/entities/Workflow" },
+      "description": "User's saved multi-step document workflows."
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": { "$ref": "#/entities/HistoryEntry" },
+      "description": "User's tool processing and download history."
+    }
+  }
+}
